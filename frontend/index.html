@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoodLuck 飞行棋</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1>GoodLuck 飞行棋</h1>
+      <div class="game-info" id="gameInfo">
+        <span id="boardName">--</span>
+        <span>当前格：<strong id="currentPos">0</strong> / <span id="totalCells">0</span></span>
+        <span id="gameStatus"></span>
+      </div>
+      <button type="button" id="restartBtn" class="restart-btn">重新开始</button>
+    </header>
+    <main class="main">
+      <section class="board-wrap">
+        <div id="board" class="board"></div>
+        <div id="diceArea" class="dice-area">
+          <div id="diceDisplay" class="dice-display">?</div>
+          <button type="button" id="rollBtn" class="roll-btn">掷骰子</button>
+          <button type="button" id="refreshContentBtn" class="refresh-content-btn">刷新格子内容</button>
+        </div>
+      </section>
+      <aside class="sidebar">
+        <h3>侧边栏</h3>
+        <div id="sideText" class="side-text"></div>
+        <h4>记录</h4>
+        <ul id="recentEvents" class="recent-events"></ul>
+      </aside>
+    </main>
+    <div id="startScreen" class="start-screen">
+      <h2>选择棋盘开始游戏</h2>
+      <div class="start-options">
+        <label>
+          棋盘格子数：
+          <input id="boardSizeInput" type="number" min="10" max="200" step="1" value="20" />
+        </label>
+        <label>
+          难度：
+          <select id="difficultySelect">
+            <option value="easy">简单 (5–50)</option>
+            <option value="hard" selected>困难 (5–100)</option>
+            <option value="hell">地狱 (5–200)</option>
+          </select>
+        </label>
+      </div>
+      <ul id="boardList" class="board-list"></ul>
+      <button type="button" id="editDatabaseBtn" class="edit-database-btn">修改数据库</button>
+    </div>
+    <div id="databaseModal" class="database-modal hidden">
+      <div class="database-modal-content">
+        <div class="database-modal-header">
+          <h2>修改数据库</h2>
+          <button type="button" id="databaseModalClose" class="database-modal-close">×</button>
+        </div>
+        <div class="database-modal-body">
+          <section class="database-section">
+            <h3>惩罚动作（格子上的动作名，如：深蹲、波比跳）</h3>
+            <div class="database-table-wrap">
+              <table class="database-table">
+                <thead>
+                  <tr><th>序号</th><th>名称</th><th>操作</th></tr>
+                </thead>
+                <tbody id="punishmentsBody"></tbody>
+              </table>
+              <button type="button" id="addPunishmentBtn" class="add-row-btn">+ 添加</button>
+            </div>
+          </section>
+          <section class="database-section">
+            <h3>命运文本（命运格随机显示的文字）</h3>
+            <div class="database-table-wrap">
+              <table class="database-table">
+                <thead>
+                  <tr><th>序号</th><th>文本</th><th>操作</th></tr>
+                </thead>
+                <tbody id="fateItemsBody"></tbody>
+              </table>
+              <button type="button" id="addFateItemBtn" class="add-row-btn">+ 添加</button>
+            </div>
+          </section>
+        </div>
+        <div class="database-modal-footer">
+          <button type="button" id="databaseSaveBtn" class="database-save-btn">保存</button>
+          <button type="button" id="databaseCancelBtn" class="database-cancel-btn">取消</button>
+        </div>
+      </div>
+    </div>
+    <div id="effectModal" class="effect-modal hidden">
+      <div class="effect-modal-content">
+        <p id="effectModalText"></p>
+        <button type="button" id="effectModalBtn" class="effect-modal-btn">确定</button>
+      </div>
+    </div>
+  </div>
+  <script src="js/app.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/database.js"></script>
+</body>
+</html>

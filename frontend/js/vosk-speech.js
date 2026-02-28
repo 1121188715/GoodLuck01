@@ -17,14 +17,16 @@
   }
 
   /**
-   * 加载 Vosk 模型
-   * @returns {Promise<{model: object}|null>} 成功返回 { model }，失败返回 null
+   * 加载 Vosk 模型（含超时，避免模型未部署或网络慢时卡住）
+   * @param {number} timeoutMs - 超时毫秒数，默认 15000
+   * @returns {Promise<{model: object}|null>} 成功返回 { model }，失败/超时返回 null
    */
-  function loadModel() {
+  function loadModel(timeoutMs) {
     if (cachedModel) return Promise.resolve({ model: cachedModel });
     if (typeof window.Vosk === "undefined") return Promise.resolve(null);
     var url = getModelUrl();
-    return window.Vosk.createModel(url)
+    var timeout = timeoutMs || 15000;
+    var loadPromise = window.Vosk.createModel(url)
       .then(function (model) {
         cachedModel = model;
         return { model: model };
@@ -32,6 +34,10 @@
       .catch(function () {
         return null;
       });
+    var timeoutPromise = new Promise(function (resolve) {
+      setTimeout(function () { resolve(null); }, timeout);
+    });
+    return Promise.race([loadPromise, timeoutPromise]);
   }
 
   /**

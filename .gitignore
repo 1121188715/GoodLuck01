@@ -1,0 +1,4 @@
+# SQLite 数据库（各环境本地独立，不纳入版本控制）
+backend/goodluck.db
+goodluck.db
+*.db

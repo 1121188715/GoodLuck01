@@ -546,6 +546,39 @@ body {
   max-height: 80px;
   overflow-y: auto;
 }
+.challenge-manual-wrap {
+  margin: 0.5rem 0 1rem 0;
+  text-align: left;
+}
+.challenge-manual-wrap label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.85);
+}
+.challenge-manual-input {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(0,0,0,0.2);
+  color: #eee;
+  resize: vertical;
+}
+.challenge-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.challenge-btn-secondary {
+  background: rgba(255,255,255,0.15);
+  color: #eee;
+}
+.challenge-btn-secondary:hover {
+  background: rgba(255,255,255,0.25);
+}
 .challenge-result {
   margin: 0 0 1rem 0;
   font-size: 1rem;

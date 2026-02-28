@@ -102,8 +102,15 @@
         <p id="challengeHint" class="challenge-hint">点击下方按钮开始录音，请清晰地从 1 数到 20。</p>
         <p id="challengeStatus" class="challenge-status"></p>
         <p id="challengeTranscript" class="challenge-transcript"></p>
+        <div id="challengeManualWrap" class="challenge-manual-wrap hidden">
+          <label for="challengeManualInput">手动输入（可用手机键盘的语音转文字）：</label>
+          <textarea id="challengeManualInput" class="challenge-manual-input" rows="4" placeholder="一 二 三 四 五 六 七 八 九 十 十一 ... 二十"></textarea>
+        </div>
         <p id="challengeResult" class="challenge-result hidden"></p>
-        <button type="button" id="challengeStartBtn" class="challenge-btn">开始录音</button>
+        <div class="challenge-actions">
+          <button type="button" id="challengeStartBtn" class="challenge-btn">开始录音</button>
+          <button type="button" id="challengeManualBtn" class="challenge-btn challenge-btn-secondary">手动输入</button>
+        </div>
         <button type="button" id="challengeSubmitBtn" class="challenge-btn hidden">确认提交</button>
         <button type="button" id="challengeConfirmBtn" class="challenge-btn hidden">确定</button>
       </div>

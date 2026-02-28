@@ -207,33 +207,53 @@
     var confirmBtn = document.getElementById("challengeConfirmBtn");
     var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!Recognition && (!window.voskSpeech || !window.voskSpeech.isAvailable())) {
-      alert("当前浏览器不支持语音识别。请使用 Chrome 或 Edge 浏览器，将视为挑战成功。");
-      window.api.post("/api/games/" + state.gameId + "/challenge-result", { success: true })
-        .then(function (res) {
-          res.side_text = res.message || "挑战格（浏览器不支持语音，视为成功）";
-          if (callback) callback(res);
-        })
-        .catch(function () {
-          if (callback) callback({ final_position: rollData.final_position, side_text: "挑战格", recent_events: rollData.recent_events, status: state.status, cells: rollData.cells });
-        });
-      return;
-    }
-
-    hint.textContent = "点击下方按钮开始录音，请清晰地从 1 数到 20（可用阿拉伯数字或中文）。";
+    hint.textContent = window.isSecureContext
+      ? "点击下方按钮开始录音，或使用手动输入（可配合手机键盘的语音转文字）。"
+      : "HTTP 下麦克风不可用，请使用手动输入（可配合手机键盘的语音转文字）。";
     statusEl.textContent = "";
     transcriptEl.textContent = "";
     resultEl.textContent = "";
     resultEl.classList.add("hidden");
-    startBtn.classList.remove("hidden");
+    var manualWrap = document.getElementById("challengeManualWrap");
+    var manualInput = document.getElementById("challengeManualInput");
+    var manualBtn = document.getElementById("challengeManualBtn");
+    manualWrap.classList.add("hidden");
+    if (manualInput) manualInput.value = "";
+    if (window.isSecureContext) {
+      startBtn.classList.remove("hidden");
+    } else {
+      startBtn.classList.add("hidden");
+    }
+    manualBtn.classList.remove("hidden");
     submitBtn.classList.add("hidden");
     confirmBtn.classList.add("hidden");
     modal.classList.remove("hidden");
 
     var transcript = "";
     var voskSession = null;
+    var manualMode = false;
+
+    manualBtn.onclick = function () {
+      manualMode = true;
+      if (voskSession && voskSession.stop) {
+        voskSession.stop();
+        voskSession = null;
+      } else if (voskSession && voskSession.type === "webspeech" && voskSession.rec) {
+        voskSession.rec.stop();
+        voskSession = null;
+      }
+      startBtn.classList.add("hidden");
+      manualBtn.classList.add("hidden");
+      manualWrap.classList.remove("hidden");
+      submitBtn.classList.remove("hidden");
+      statusEl.textContent = "在输入框中输入或使用手机键盘语音转文字，然后点击确认提交。";
+    };
 
     startBtn.onclick = function () {
+      if (!window.isSecureContext) {
+        statusEl.textContent = "HTTP 下麦克风不可用，请使用手动输入。";
+        return;
+      }
       transcript = "";
       transcriptEl.textContent = "";
       resultEl.classList.add("hidden");
@@ -242,8 +262,8 @@
 
       function tryVoskFirst() {
         if (!window.voskSpeech || !window.voskSpeech.isAvailable()) return false;
-        statusEl.textContent = "正在加载 Vosk 模型，请稍候...";
-        return window.voskSpeech.loadModel()
+        statusEl.textContent = "正在加载 Vosk 模型（约 15 秒超时，超时将使用浏览器识别）...";
+        return window.voskSpeech.loadModel(15000)
           .then(function (data) {
             if (!data || !data.model) return null;
             statusEl.textContent = "正在录音...请从 1 数到 20";
@@ -310,7 +330,6 @@
 
     submitBtn.onclick = function () {
       submitBtn.disabled = true;
-      statusEl.textContent = "转写处理中，请稍候...";
 
       function finish(finalTranscript) {
         var success = validateCount1To20(finalTranscript);
@@ -321,11 +340,20 @@
         submitBtn.classList.add("hidden");
         submitBtn.disabled = false;
         confirmBtn.classList.remove("hidden");
+        if (manualMode && manualWrap) manualWrap.classList.add("hidden");
         confirmBtn.onclick = function () {
           submitChallengeAndClose(modal, startBtn, submitBtn, confirmBtn, success, rollData, callback);
         };
       }
 
+      if (manualMode && manualInput) {
+        statusEl.textContent = "校验中...";
+        var val = (manualInput.value || "").trim();
+        finish(val);
+        return;
+      }
+
+      statusEl.textContent = "转写处理中，请稍候...";
       if (voskSession && voskSession.stop) {
         var finalTranscript = voskSession.getLastTranscript ? voskSession.getLastTranscript() : transcript;
         voskSession.stop();

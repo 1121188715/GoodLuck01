@@ -175,9 +175,21 @@ body {
   background: #3d2a5c;
   border: 2px solid #5c3d8a;
 }
+.cell.back_to_start {
+  background: #5c1e1e;
+  border: 2px solid #8a2d2d;
+}
+.cell.jump_to_end {
+  background: #1e4a2a;
+  border: 2px solid #2d6a3d;
+}
 .cell.double_next {
   background: #5c3d1e;
   border: 2px solid #8a5c2d;
+}
+.cell.challenge {
+  background: #2a4a5c;
+  border: 2px solid #3d6a8a;
 }
 .cell.current {
   box-shadow: 0 0 0 3px #f0c14b;
@@ -490,6 +502,66 @@ body {
   cursor: pointer;
 }
 .effect-modal-btn:hover {
+  background: #5a9c69;
+}
+
+.challenge-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+}
+.challenge-modal.hidden {
+  display: none;
+}
+.challenge-modal-content {
+  background: #2d3a4f;
+  border: 2px solid #3d4f6d;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  min-width: 280px;
+}
+.challenge-modal-content h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+}
+.challenge-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.85);
+}
+.challenge-status {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #7cb;
+}
+.challenge-transcript {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+  max-height: 80px;
+  overflow-y: auto;
+}
+.challenge-result {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #9ed;
+}
+.challenge-btn {
+  padding: 0.5rem 1.2rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #4a7c59;
+  color: #fff;
+  cursor: pointer;
+}
+.challenge-btn:hover {
   background: #5a9c69;
 }
 

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
-from app.schemas.game import GameCreate, GameOut, GameRollResponse
-from app.services.game_service import create_game, get_game, roll_dice
+from app.schemas.game import GameCreate, GameOut, GameRollResponse, ChallengeResultRequest
+from app.services.game_service import create_game, get_game, roll_dice, submit_challenge_result
 
 router = APIRouter(prefix="/api/games", tags=["games"])
 
@@ -39,6 +39,18 @@ async def get_game_state(
 @router.post("/{game_id}/roll", response_model=dict)
 async def post_roll(game_id: int, session: AsyncSession = Depends(get_db)):
     result = await roll_dice(session, game_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Game not found or already finished")
+    return {"data": result, "error": None}
+
+
+@router.post("/{game_id}/challenge-result", response_model=dict)
+async def post_challenge_result(
+    game_id: int,
+    body: ChallengeResultRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    result = await submit_challenge_result(session, game_id, body.success)
     if not result:
         raise HTTPException(status_code=404, detail="Game not found or already finished")
     return {"data": result, "error": None}

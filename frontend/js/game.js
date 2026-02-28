@@ -122,6 +122,135 @@
     document.getElementById("sideText").textContent = text || "";
   }
 
+  /** 校验语音转文字：数字 1-20 不缺不少、顺序正确、中间无过多多余文字即成功 */
+  function validateCount1To20(text) {
+    if (!text || typeof text !== "string") return false;
+    var s = text.trim().replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+    if (!s.length) return false;
+    var nums = [];
+    var cnMap = { 二十: 20, 十九: 19, 十八: 18, 十七: 17, 十六: 16, 十五: 15, 十四: 14, 十三: 13, 十二: 12, 十一: 11, 十: 10, 九: 9, 八: 8, 七: 7, 六: 6, 五: 5, 四: 4, 三: 3, 二: 2, 一: 1 };
+    var re = /二十|十九|十八|十七|十六|十五|十四|十三|十二|十一|十|九|八|七|六|五|四|三|二|一|\d+/g;
+    var m;
+    while ((m = re.exec(s)) !== null) {
+      if (cnMap[m[0]] !== undefined) {
+        nums.push(cnMap[m[0]]);
+      } else if (/^\d+$/.test(m[0])) {
+        var n = parseInt(m[0], 10);
+        if (n >= 1 && n <= 20) {
+          nums.push(n);
+        } else if (n > 20 && /^[1-9]+$/.test(m[0])) {
+          for (var j = 0; j < m[0].length; j++) {
+            var d = parseInt(m[0][j], 10);
+            if (d >= 1 && d <= 9) nums.push(d);
+          }
+        }
+      }
+    }
+    if (nums.length !== 20) return false;
+    for (var i = 0; i < 20; i++) {
+      if (nums[i] !== i + 1) return false;
+    }
+    var numRe = /二十|十九|十八|十七|十六|十五|十四|十三|十二|十一|十|九|八|七|六|五|四|三|二|一|\d+/g;
+    var numMatches = s.match(numRe);
+    var numChars = numMatches ? numMatches.join("").length : 0;
+    var extraChars = Math.max(0, s.replace(/\s/g, "").length - numChars);
+    if (extraChars > 5) return false;
+    return true;
+  }
+
+  /** 显示挑战格弹窗：语音转文字，校验 1~20，先展示转写与判定，用户点确定后再提交结果 */
+  function showChallengeModal(rollData, callback) {
+    var modal = document.getElementById("challengeModal");
+    var hint = document.getElementById("challengeHint");
+    var statusEl = document.getElementById("challengeStatus");
+    var transcriptEl = document.getElementById("challengeTranscript");
+    var resultEl = document.getElementById("challengeResult");
+    var startBtn = document.getElementById("challengeStartBtn");
+    var submitBtn = document.getElementById("challengeSubmitBtn");
+    var confirmBtn = document.getElementById("challengeConfirmBtn");
+    var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      alert("当前浏览器不支持语音识别。请使用 Chrome 或 Edge 浏览器，将视为挑战成功。");
+      window.api.post("/api/games/" + state.gameId + "/challenge-result", { success: true })
+        .then(function (res) {
+          res.side_text = res.message || "挑战格（浏览器不支持语音，视为成功）";
+          if (callback) callback(res);
+        })
+        .catch(function () {
+          if (callback) callback({ final_position: rollData.final_position, side_text: "挑战格", recent_events: rollData.recent_events, status: state.status, cells: rollData.cells });
+        });
+      return;
+    }
+    hint.textContent = "点击下方按钮开始录音，请清晰地从 1 数到 20（可用阿拉伯数字或中文）。";
+    statusEl.textContent = "";
+    transcriptEl.textContent = "";
+    resultEl.textContent = "";
+    resultEl.classList.add("hidden");
+    startBtn.classList.remove("hidden");
+    submitBtn.classList.add("hidden");
+    confirmBtn.classList.add("hidden");
+    modal.classList.remove("hidden");
+    var transcript = "";
+    var rec = new Recognition();
+    rec.continuous = true;
+    rec.lang = "zh-CN";
+    rec.interimResults = false;
+    rec.onresult = function (e) {
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        transcript += e.results[i][0].transcript;
+      }
+      transcriptEl.textContent = transcript;
+    };
+    rec.onerror = function (e) {
+      statusEl.textContent = "录音出错：" + (e.error || "未知错误");
+    };
+    startBtn.onclick = function () {
+      transcript = "";
+      transcriptEl.textContent = "";
+      resultEl.classList.add("hidden");
+      statusEl.textContent = "正在录音...请从 1 数到 20";
+      rec.start();
+      startBtn.classList.add("hidden");
+      submitBtn.classList.remove("hidden");
+    };
+    submitBtn.onclick = function () {
+      submitBtn.disabled = true;
+      statusEl.textContent = "转写处理中，请稍候...";
+      rec.onend = function () {
+        rec.onend = null;
+        var finalTranscript = transcript;
+        var success = validateCount1To20(finalTranscript);
+        statusEl.textContent = "转写结果：";
+        transcriptEl.textContent = finalTranscript || "（无识别内容）";
+        resultEl.textContent = success ? "判定：挑战成功！" : "判定：挑战失败，将后退 2 格。";
+        resultEl.classList.remove("hidden");
+        submitBtn.classList.add("hidden");
+        submitBtn.disabled = false;
+        confirmBtn.classList.remove("hidden");
+        confirmBtn.onclick = function () {
+        modal.classList.add("hidden");
+        startBtn.onclick = null;
+        submitBtn.onclick = null;
+        confirmBtn.onclick = null;
+        startBtn.classList.remove("hidden");
+        confirmBtn.classList.add("hidden");
+        window.api
+          .post("/api/games/" + state.gameId + "/challenge-result", { success: success })
+          .then(function (res) {
+            var d = res;
+            d.side_text = d.message || "";
+            if (callback) callback(d);
+          })
+          .catch(function (err) {
+            alert("提交挑战结果失败：" + (err.message || err));
+            if (callback) callback({ final_position: rollData.final_position, side_text: "挑战格（提交失败）", recent_events: rollData.recent_events, status: state.status, cells: rollData.cells });
+          });
+      };
+      };
+      rec.stop();
+    };
+  }
+
   /** 显示特效弹窗，点击确定后执行 callback */
   function showEffectModal(message, callback) {
     var modal = document.getElementById("effectModal");
@@ -184,11 +313,36 @@
               showEffectModal(message || "下一次翻倍！接下来两次掷骰中，所有格子数字将翻倍。", function () {
                 finishRoll(data);
               });
-            } else if (effect && (effect.type === "advance" || effect.type === "retreat") && to !== finalPos) {
-              showEffectModal(message || (effect.type === "advance" ? "前进 " + (effect.steps || 0) + " 格！" : "后退 " + (effect.steps || 0) + " 格！"), function () {
+            } else if (effect && effect.type === "challenge") {
+              state.currentPosition = to;
+              window.boardRender.setPiecePosition(to);
+              showChallengeModal(data, function (result) {
+                if (!result.success && result.final_position !== undefined && result.final_position < state.currentPosition) {
+                  window.boardRender.animatePiece(state.currentPosition, result.final_position, STEP_DELAY_MS, function () {
+                    finishRoll(result);
+                  });
+                } else {
+                  finishRoll(result);
+                }
+              });
+            } else if (to !== finalPos && (effect && (effect.type === "advance" || effect.type === "retreat" || effect.type === "back_to_start" || effect.type === "jump_to_end"))) {
+              var msg = message || (effect && effect.type === "advance" ? "前进 " + (effect.steps || 0) + " 格！" : effect && effect.type === "retreat" ? "后退 " + (effect.steps || 0) + " 格！" : effect && effect.type === "back_to_start" ? "退回起点！" : "直达终点！");
+              if (data.chain_triggered) {
+                msg = "【链式效果已触发】从格" + to + " 移动到格" + finalPos + "\n\n" + msg;
+              } else {
+                msg = msg + "\n\n（从格" + to + " 到格" + finalPos + "）";
+              }
+              showEffectModal(msg, function () {
                 window.boardRender.animatePiece(to, finalPos, STEP_DELAY_MS, function () {
                   finishRoll(data);
                 });
+              });
+            } else if (to !== finalPos) {
+              if (data.chain_triggered) {
+                alert("【链式效果已触发】从格" + to + " 移动到格" + finalPos);
+              }
+              window.boardRender.animatePiece(to, finalPos, STEP_DELAY_MS, function () {
+                finishRoll(data);
               });
             } else {
               finishRoll(data);

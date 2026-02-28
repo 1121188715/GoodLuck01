@@ -31,3 +31,7 @@ class GameRollResponse(BaseModel):
     message: Optional[str] = None
     recent_events: Optional[List[Any]] = None
     status: Optional[str] = None  # playing | finished
+
+
+class ChallengeResultRequest(BaseModel):
+    success: bool  # 语音转文字是否满足「从1数到20」

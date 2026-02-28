@@ -15,6 +15,7 @@ class EffectResult:
     message: str | None = None
     event_record: dict | None = None  # 用于 recent_events
     activate_double: bool = False  # 是否激活翻倍效果
+    effect_type: str | None = None  # 特殊类型，如 "challenge" 需前端交互
 
 
 async def apply_cell_effect(
@@ -105,6 +106,16 @@ async def apply_cell_effect(
                 "type": "show_text",
                 "detail": result.message,
             }
+        return result
+
+    if cell_type == "challenge":
+        result.effect_type = "challenge"
+        result.message = "挑战格：请从1数到20，麦克风将录制你的语音。"
+        result.event_record = {
+            "position": current_position,
+            "type": "challenge",
+            "detail": "挑战格",
+        }
         return result
 
     return result

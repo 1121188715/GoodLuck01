@@ -96,8 +96,20 @@
         <button type="button" id="effectModalBtn" class="effect-modal-btn">确定</button>
       </div>
     </div>
+    <div id="challengeModal" class="challenge-modal hidden">
+      <div class="challenge-modal-content">
+        <h3>挑战格：从 1 数到 20</h3>
+        <p id="challengeHint" class="challenge-hint">点击下方按钮开始录音，请清晰地从 1 数到 20。</p>
+        <p id="challengeStatus" class="challenge-status"></p>
+        <p id="challengeTranscript" class="challenge-transcript"></p>
+        <p id="challengeResult" class="challenge-result hidden"></p>
+        <button type="button" id="challengeStartBtn" class="challenge-btn">开始录音</button>
+        <button type="button" id="challengeSubmitBtn" class="challenge-btn hidden">确认提交</button>
+        <button type="button" id="challengeConfirmBtn" class="challenge-btn hidden">确定</button>
+      </div>
+    </div>
   </div>
-  <div id="appVersion" class="app-version">v1.0.0.1</div>
+  <div id="appVersion" class="app-version">v1.0.1.0</div>
   <script src="js/app.js"></script>
   <script src="js/board.js"></script>
   <script src="js/game.js"></script>

@@ -44,22 +44,26 @@ async def create_game(
 
         total = cell_count
         inner_positions = list(range(1, max(1, total - 1)))  # 排除起点和终点
-        random.shuffle(inner_positions)
-        idx = 0
-        n_advance = min(max(1, total // 10), len(inner_positions))
-        advance_positions = set(inner_positions[idx : idx + n_advance])
-        idx += n_advance
-        n_retreat = min(max(1, total // 12), max(0, len(inner_positions) - idx))
-        retreat_positions = set(inner_positions[idx : idx + n_retreat])
-        idx += n_retreat
-        # 翻倍格：总格数的 1/20，随机布置；预留 2 个位置给退回起点、直达终点
-        remaining = max(0, len(inner_positions) - idx - 2)
-        n_double = min(max(1, total // 20), remaining) if remaining > 0 else 0
-        double_positions = set(inner_positions[idx : idx + n_double]) if n_double > 0 else set()
-        idx += n_double
-        back_to_start_pos = inner_positions[idx] if idx < len(inner_positions) else None
-        idx += 1
-        jump_to_end_pos = inner_positions[idx] if idx < len(inner_positions) else None
+        if len(inner_positions) < 3:
+            back_to_start_pos = jump_to_end_pos = challenge_pos = None
+            advance_positions = set()
+            retreat_positions = set()
+            double_positions = set()
+        else:
+            random.shuffle(inner_positions)
+            back_to_start_pos = inner_positions[0]
+            jump_to_end_pos = inner_positions[1]
+            challenge_pos = inner_positions[2]
+            pool = inner_positions[3:]
+            idx = 0
+            n_advance = min(max(1, total // 10), len(pool))
+            advance_positions = set(pool[idx : idx + n_advance])
+            idx += n_advance
+            n_retreat = min(max(1, total // 12), max(0, len(pool) - idx))
+            retreat_positions = set(pool[idx : idx + n_retreat])
+            idx += n_retreat
+            n_double = min(max(1, total // 20), max(0, len(pool) - idx))
+            double_positions = set(pool[idx : idx + n_double]) if n_double > 0 else set()
 
         for i in range(cell_count):
             cell_type = "normal"
@@ -78,6 +82,8 @@ async def create_game(
                 cell_type = "back_to_start"
             elif jump_to_end_pos is not None and i == jump_to_end_pos:
                 cell_type = "jump_to_end"
+            elif challenge_pos is not None and i == challenge_pos:
+                cell_type = "challenge"
 
             session.add(
                 Cell(
@@ -169,6 +175,8 @@ async def _build_cells(
             display_text = "下一次翻倍"
         elif c.cell_type == "show_text":
             display_text = "命运"
+        elif c.cell_type == "challenge":
+            display_text = "挑战"
         else:
             # 用种子保证同局内普通格内容稳定，只有刷新时才改变
             custom_punishments, _ = _get_custom_content(game.events)
@@ -265,23 +273,39 @@ async def roll_dice(session: AsyncSession, game_id: int) -> dict | None:
         "side_text": None,
         "message": None,
         "recent_events": None,
+        "chain_triggered": False,
+        "effect_chain_count": 0,
     }
 
     dr_before = getattr(game, "double_remaining_rolls", 0)
 
-    # 到达的格子效果
+    # 到达的格子效果（链式：前进/后退后若落到特殊格，继续触发直到无位置变化）
     _, custom_fate_items = _get_custom_content(game.events)
-    cell_at = next((c for c in board.cells if c.position == to_position), None)
-    if cell_at:
+    pos_by_pos = {c.position: c for c in board.cells}
+    cur_pos = to_position
+    max_chain = 20
+    chain_count = 0
+    while chain_count < max_chain:
+        chain_count += 1
+        cell_at = pos_by_pos.get(cur_pos)
+        if not cell_at:
+            break
         effect_result: EffectResult = await apply_cell_effect(
             session,
             cell_at.cell_type,
             cell_at.effect_param,
             cell_at.content_pool_id,
-            to_position,
+            cur_pos,
             max_pos,
             custom_fate_items=custom_fate_items,
         )
+        if effect_result.effect_type == "challenge":
+            out["effect"] = {"type": "challenge", "message": effect_result.message}
+            if effect_result.message:
+                out["message"] = effect_result.message
+            if effect_result.event_record:
+                game.events = _append_event(game.events, effect_result.event_record)
+            break
         if effect_result.activate_double:
             game.double_remaining_rolls = 2
             out["effect"] = {"type": "double_next", "message": effect_result.message}
@@ -289,20 +313,36 @@ async def roll_dice(session: AsyncSession, game_id: int) -> dict | None:
                 out["message"] = effect_result.message
             if effect_result.event_record:
                 game.events = _append_event(game.events, effect_result.event_record)
-        else:
-            if effect_result.new_position is not None and effect_result.new_position != to_position:
-                game.current_position = effect_result.new_position
-                out["final_position"] = effect_result.new_position
+            break
+        new_pos = effect_result.new_position
+        if new_pos is not None and new_pos != cur_pos:
+            game.current_position = new_pos
+            out["final_position"] = new_pos
+            if cell_at.cell_type == "back_to_start":
+                out["effect"] = {"type": "back_to_start", "steps": cur_pos}
+            elif cell_at.cell_type == "jump_to_end":
+                out["effect"] = {"type": "jump_to_end", "steps": max_pos - cur_pos}
+            else:
                 out["effect"] = {
-                    "type": "advance" if effect_result.new_position > to_position else "retreat",
-                    "steps": abs(effect_result.new_position - to_position),
+                    "type": "advance" if new_pos > cur_pos else "retreat",
+                    "steps": abs(new_pos - cur_pos),
                 }
+            if effect_result.message:
+                out["message"] = effect_result.message
+            if effect_result.event_record:
+                game.events = _append_event(game.events, effect_result.event_record)
+            cur_pos = new_pos
+            out["effect_chain_count"] = chain_count
+            if chain_count > 1:
+                out["chain_triggered"] = True
+        else:
             if effect_result.side_text is not None:
                 out["side_text"] = effect_result.side_text
             if effect_result.message:
                 out["message"] = effect_result.message
             if effect_result.event_record:
                 game.events = _append_event(game.events, effect_result.event_record)
+            break
 
     # 每轮掷骰结束后，翻倍剩余次数减一
     dr = getattr(game, "double_remaining_rolls", 0)
@@ -325,3 +365,53 @@ async def roll_dice(session: AsyncSession, game_id: int) -> dict | None:
     out["status"] = game.status
     out["double_remaining_rolls"] = getattr(game, "double_remaining_rolls", 0)
     return out
+
+
+async def submit_challenge_result(
+    session: AsyncSession, game_id: int, success: bool
+) -> dict | None:
+    """提交挑战格结果：成功无惩罚，失败后退2格"""
+    result = await session.execute(
+        select(GameSession).where(GameSession.id == game_id)
+    )
+    game = result.scalar_one_or_none()
+    if not game or game.status != "playing":
+        return None
+    board = await get_board_with_cells(session, game.board_id)
+    if not board:
+        return None
+    max_pos = board.cell_count - 1
+    if max_pos < 0:
+        max_pos = 0
+
+    pos = game.current_position
+    event_detail = "挑战成功" if success else "挑战失败，后退2格"
+    if success:
+        game.events = _append_event(game.events, {
+            "position": pos,
+            "type": "challenge",
+            "detail": event_detail,
+        })
+    else:
+        new_pos = max(0, pos - 2)
+        game.current_position = new_pos
+        game.events = _append_event(game.events, {
+            "position": pos,
+            "type": "challenge",
+            "detail": event_detail,
+        })
+    if game.current_position >= max_pos:
+        game.status = "finished"
+    await session.flush()
+
+    difficulty = _get_difficulty(game.events)
+    await session.refresh(game)
+    cells = await _build_cells(session, board, game, difficulty, refresh_content=False)
+    return {
+        "final_position": game.current_position,
+        "success": success,
+        "message": event_detail,
+        "recent_events": _parse_events(game.events),
+        "cells": cells,
+        "status": game.status,
+    }

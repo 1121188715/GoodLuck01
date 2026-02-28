@@ -122,7 +122,7 @@
     document.getElementById("sideText").textContent = text || "";
   }
 
-  /** 校验语音转文字：数字 1-20 不缺不少、顺序正确、中间无过多多余文字即成功 */
+  /** 校验语音转文字：数字 1-20 顺序基本正确、错误数<2、多余文字≤10 即成功（兼容同音字/识别误差） */
   function validateCount1To20(text) {
     if (!text || typeof text !== "string") return false;
     var s = text.trim().replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
@@ -146,19 +146,56 @@
         }
       }
     }
-    if (nums.length !== 20) return false;
-    for (var i = 0; i < 20; i++) {
-      if (nums[i] !== i + 1) return false;
-    }
+    if (nums.length < 18 || nums.length > 22) return false;
+    /* 多余文字不超过 10 个 */
     var numRe = /二十|十九|十八|十七|十六|十五|十四|十三|十二|十一|十|九|八|七|六|五|四|三|二|一|\d+/g;
     var numMatches = s.match(numRe);
     var numChars = numMatches ? numMatches.join("").length : 0;
     var extraChars = Math.max(0, s.replace(/\s/g, "").length - numChars);
-    if (extraChars > 5) return false;
-    return true;
+    if (extraChars > 10) return false;
+    /* 错误数字 < 2：编辑距离（缺失/多余/替换）不超过 2 即通过 */
+    var dp = [];
+    var i, j;
+    for (i = 0; i <= 20; i++) {
+      dp[i] = [];
+      for (j = 0; j <= nums.length; j++) dp[i][j] = 999;
+    }
+    dp[0][0] = 0;
+    for (j = 1; j <= nums.length; j++) dp[0][j] = j;
+    for (i = 1; i <= 20; i++) dp[i][0] = i;
+    for (i = 0; i < 20; i++) {
+      for (j = 0; j < nums.length; j++) {
+        var cost = nums[j] === i + 1 ? 0 : 1;
+        dp[i + 1][j + 1] = Math.min(dp[i + 1][j + 1], dp[i][j] + cost);
+        dp[i + 1][j] = Math.min(dp[i + 1][j], dp[i][j] + 1);
+        dp[i][j + 1] = Math.min(dp[i][j + 1], dp[i][j] + 1);
+      }
+    }
+    return dp[20][nums.length] < 2;
   }
 
-  /** 显示挑战格弹窗：语音转文字，校验 1~20，先展示转写与判定，用户点确定后再提交结果 */
+  /** 提交挑战结果并关闭弹窗 */
+  function submitChallengeAndClose(modal, startBtn, submitBtn, confirmBtn, success, rollData, callback) {
+    modal.classList.add("hidden");
+    startBtn.onclick = null;
+    submitBtn.onclick = null;
+    confirmBtn.onclick = null;
+    startBtn.classList.remove("hidden");
+    confirmBtn.classList.add("hidden");
+    window.api
+      .post("/api/games/" + state.gameId + "/challenge-result", { success: success })
+      .then(function (res) {
+        var d = res;
+        d.side_text = d.message || "";
+        if (callback) callback(d);
+      })
+      .catch(function (err) {
+        alert("提交挑战结果失败：" + (err.message || err));
+        if (callback) callback({ final_position: rollData.final_position, side_text: "挑战格（提交失败）", recent_events: rollData.recent_events, status: state.status, cells: rollData.cells });
+      });
+  }
+
+  /** 显示挑战格弹窗：优先 Vosk 离线识别，不可用时回退 Web Speech API；校验 1~20 */
   function showChallengeModal(rollData, callback) {
     var modal = document.getElementById("challengeModal");
     var hint = document.getElementById("challengeHint");
@@ -169,7 +206,8 @@
     var submitBtn = document.getElementById("challengeSubmitBtn");
     var confirmBtn = document.getElementById("challengeConfirmBtn");
     var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) {
+
+    if (!Recognition && (!window.voskSpeech || !window.voskSpeech.isAvailable())) {
       alert("当前浏览器不支持语音识别。请使用 Chrome 或 Edge 浏览器，将视为挑战成功。");
       window.api.post("/api/games/" + state.gameId + "/challenge-result", { success: true })
         .then(function (res) {
@@ -181,6 +219,7 @@
         });
       return;
     }
+
     hint.textContent = "点击下方按钮开始录音，请清晰地从 1 数到 20（可用阿拉伯数字或中文）。";
     statusEl.textContent = "";
     transcriptEl.textContent = "";
@@ -190,35 +229,90 @@
     submitBtn.classList.add("hidden");
     confirmBtn.classList.add("hidden");
     modal.classList.remove("hidden");
+
     var transcript = "";
-    var rec = new Recognition();
-    rec.continuous = true;
-    rec.lang = "zh-CN";
-    rec.interimResults = false;
-    rec.onresult = function (e) {
-      for (var i = e.resultIndex; i < e.results.length; i++) {
-        transcript += e.results[i][0].transcript;
-      }
-      transcriptEl.textContent = transcript;
-    };
-    rec.onerror = function (e) {
-      statusEl.textContent = "录音出错：" + (e.error || "未知错误");
-    };
+    var voskSession = null;
+
     startBtn.onclick = function () {
       transcript = "";
       transcriptEl.textContent = "";
       resultEl.classList.add("hidden");
-      statusEl.textContent = "正在录音...请从 1 数到 20";
-      rec.start();
-      startBtn.classList.add("hidden");
-      submitBtn.classList.remove("hidden");
+      statusEl.textContent = "正在准备语音识别...";
+      startBtn.disabled = true;
+
+      function tryVoskFirst() {
+        if (!window.voskSpeech || !window.voskSpeech.isAvailable()) return false;
+        statusEl.textContent = "正在加载 Vosk 模型，请稍候...";
+        return window.voskSpeech.loadModel()
+          .then(function (data) {
+            if (!data || !data.model) return null;
+            statusEl.textContent = "正在录音...请从 1 数到 20";
+            startBtn.classList.add("hidden");
+            submitBtn.classList.remove("hidden");
+            startBtn.disabled = false;
+            return window.voskSpeech.startRecording(
+              data.model,
+              function (partial) {
+                transcriptEl.textContent = (transcript ? transcript + " " : "") + partial;
+              },
+              function (text) {
+                transcript = (transcript ? transcript + " " : "") + text;
+                transcriptEl.textContent = transcript;
+              }
+            );
+          })
+          .then(function (session) {
+            if (session) {
+              voskSession = session;
+              return true;
+            }
+            return false;
+          })
+          .catch(function () { return false; });
+      }
+
+      function useWebSpeech() {
+        if (!Recognition) {
+          statusEl.textContent = "语音识别不可用，将视为挑战成功。";
+          startBtn.disabled = false;
+          return;
+        }
+        statusEl.textContent = "正在录音...请从 1 数到 20";
+        startBtn.classList.add("hidden");
+        submitBtn.classList.remove("hidden");
+        startBtn.disabled = false;
+        var rec = new Recognition();
+        rec.continuous = true;
+        rec.lang = "zh-CN";
+        rec.interimResults = false;
+        rec.onresult = function (e) {
+          for (var i = e.resultIndex; i < e.results.length; i++) {
+            transcript += e.results[i][0].transcript;
+          }
+          transcriptEl.textContent = transcript;
+        };
+        rec.onerror = function (e) {
+          statusEl.textContent = "录音出错：" + (e.error || "未知错误");
+        };
+        rec.start();
+        voskSession = { type: "webspeech", rec: rec };
+      }
+
+      var p = tryVoskFirst();
+      if (p && typeof p.then === "function") {
+        p.then(function (used) {
+          if (!used) useWebSpeech();
+        });
+      } else {
+        useWebSpeech();
+      }
     };
+
     submitBtn.onclick = function () {
       submitBtn.disabled = true;
       statusEl.textContent = "转写处理中，请稍候...";
-      rec.onend = function () {
-        rec.onend = null;
-        var finalTranscript = transcript;
+
+      function finish(finalTranscript) {
         var success = validateCount1To20(finalTranscript);
         statusEl.textContent = "转写结果：";
         transcriptEl.textContent = finalTranscript || "（无识别内容）";
@@ -228,26 +322,24 @@
         submitBtn.disabled = false;
         confirmBtn.classList.remove("hidden");
         confirmBtn.onclick = function () {
-        modal.classList.add("hidden");
-        startBtn.onclick = null;
-        submitBtn.onclick = null;
-        confirmBtn.onclick = null;
-        startBtn.classList.remove("hidden");
-        confirmBtn.classList.add("hidden");
-        window.api
-          .post("/api/games/" + state.gameId + "/challenge-result", { success: success })
-          .then(function (res) {
-            var d = res;
-            d.side_text = d.message || "";
-            if (callback) callback(d);
-          })
-          .catch(function (err) {
-            alert("提交挑战结果失败：" + (err.message || err));
-            if (callback) callback({ final_position: rollData.final_position, side_text: "挑战格（提交失败）", recent_events: rollData.recent_events, status: state.status, cells: rollData.cells });
-          });
-      };
-      };
-      rec.stop();
+          submitChallengeAndClose(modal, startBtn, submitBtn, confirmBtn, success, rollData, callback);
+        };
+      }
+
+      if (voskSession && voskSession.stop) {
+        var finalTranscript = voskSession.getLastTranscript ? voskSession.getLastTranscript() : transcript;
+        voskSession.stop();
+        voskSession = null;
+        finish(finalTranscript || transcriptEl.textContent);
+      } else if (voskSession && voskSession.type === "webspeech" && voskSession.rec) {
+        voskSession.rec.onend = function () {
+          voskSession.rec.onend = null;
+          finish(transcript);
+        };
+        voskSession.rec.stop();
+      } else {
+        finish(transcript);
+      }
     };
   }
 

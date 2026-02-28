@@ -19,7 +19,13 @@
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined,
       });
-      const json = await res.json();
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        throw new Error(res.status === 500 ? "服务器内部错误，请检查后端日志" : (text.slice(0, 80) || "请求失败"));
+      }
       if (!res.ok) throw new Error(json.detail || "请求失败");
       return json.data;
     },

@@ -15,6 +15,8 @@ async def post_create_game(body: GameCreate, session: AsyncSession = Depends(get
         body.user_id,
         body.cell_count,
         body.difficulty,
+        body.custom_punishments,
+        body.custom_fate_items,
     )
     if not game:
         raise HTTPException(status_code=404, detail="Board not found")

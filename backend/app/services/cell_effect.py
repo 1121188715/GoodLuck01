@@ -1,5 +1,6 @@
 """各 CellType 的效果实现；到达格子时根据 type + effect_param 计算新位置或侧边文案"""
 import json
+import random
 from typing import Any
 from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,7 @@ async def apply_cell_effect(
     content_pool_id: int | None,
     current_position: int,
     max_position: int,
+    custom_fate_items: list | None = None,
 ) -> EffectResult:
     """根据格子类型和参数执行效果，返回新位置（若有）、侧边文案、事件记录。"""
     result = EffectResult(new_position=current_position)
@@ -90,15 +92,19 @@ async def apply_cell_effect(
         }
         return result
 
-    if cell_type == "show_text" and content_pool_id:
-        text = await get_random_content(session, content_pool_id)
-        result.side_text = text or ""
-        result.message = "触发命运格"
-        result.event_record = {
-            "position": current_position,
-            "type": "show_text",
-            "detail": result.message,
-        }
+    if cell_type == "show_text":
+        if custom_fate_items and len(custom_fate_items) > 0:
+            result.side_text = random.choice(custom_fate_items)
+        elif content_pool_id:
+            text = await get_random_content(session, content_pool_id)
+            result.side_text = text or ""
+        if result.side_text is not None:
+            result.message = "触发命运格"
+            result.event_record = {
+                "position": current_position,
+                "type": "show_text",
+                "detail": result.message,
+            }
         return result
 
     return result

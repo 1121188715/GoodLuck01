@@ -7,6 +7,8 @@ class GameCreate(BaseModel):
     user_id: Optional[int] = None
     cell_count: Optional[int] = None
     difficulty: Optional[str] = None  # easy | hard | hell
+    custom_punishments: Optional[List[str]] = None  # 本地自定义惩罚动作，优先级高于服务器
+    custom_fate_items: Optional[List[str]] = None   # 本地自定义命运文本
 
 
 class GameOut(BaseModel):

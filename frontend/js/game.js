@@ -53,9 +53,21 @@
     document.getElementById("refreshContentBtn").style.display = "none";
   }
 
+  function getLocalContent() {
+    try {
+      var raw = localStorage.getItem("goodluck_local_content");
+      if (!raw) return { punishments: null, fate_items: null };
+      var stored = JSON.parse(raw);
+      return {
+        punishments: stored.punishments && stored.punishments.length ? stored.punishments : null,
+        fate_items: stored.fate_items && stored.fate_items.length ? stored.fate_items : null,
+      };
+    } catch (e) { return { punishments: null, fate_items: null }; }
+  }
+
   function startGame(boardId) {
-    window.api
-      .post("/api/games", {
+    var local = getLocalContent();
+    var body = {
         board_id: boardId,
         cell_count: (function () {
           var el = document.getElementById("boardSizeInput");
@@ -70,7 +82,11 @@
           var sel = document.getElementById("difficultySelect");
           return sel ? sel.value : "hard";
         })(),
-      })
+      };
+    if (local.punishments) body.custom_punishments = local.punishments;
+    if (local.fate_items) body.custom_fate_items = local.fate_items;
+    window.api
+      .post("/api/games", body)
       .then(function (data) {
         state.gameId = data.game_id;
         state.boardName = data.board_name;

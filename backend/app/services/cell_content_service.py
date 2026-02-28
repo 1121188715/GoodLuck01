@@ -14,7 +14,11 @@ def _random_multiple_of_5(max_val: int = 100, min_val: int = 5, rng=None) -> int
     return rng.choice(choices)
 
 
-async def get_random_punishment(session: AsyncSession, rng=None) -> str | None:
+async def get_random_punishment(session: AsyncSession, rng=None, custom_list: list | None = None) -> str | None:
+    """从数据库或自定义列表随机取惩罚名。custom_list 优先于数据库。"""
+    if custom_list and len(custom_list) > 0:
+        rng = rng or random
+        return rng.choice(custom_list)
     result = await session.execute(select(Punishment))
     items = list(result.scalars().all())
     if not items:
@@ -45,6 +49,7 @@ async def generate_cell_content(
     difficulty: str | None = None,
     multiplier: int = 1,
     rng=None,
+    custom_punishments: list | None = None,
 ) -> str:
     """根据难度随机生成格子内容：惩罚动作 + 5 的倍数。
 
@@ -57,7 +62,7 @@ async def generate_cell_content(
     rng: 可选的随机实例，用于确定性输出（同局内保持稳定）
     """
     rng = rng or random
-    name = await get_random_punishment(session, rng=rng)
+    name = await get_random_punishment(session, rng=rng, custom_list=custom_punishments)
     if not name:
         name = "休息"
     max_val = 100

@@ -11,8 +11,39 @@
     modal.classList.add("hidden");
   }
 
+  var STORAGE_KEY = "goodluck_local_content";
+
+  function loadFromLocal() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var stored = JSON.parse(raw);
+      if (!stored.punishments || !stored.punishments.length) return null;
+      return stored;
+    } catch (e) { return null; }
+  }
+
+  function saveToLocal() {
+    var payload = {
+      punishments: data.punishments.map(function (p) { return p.name || ""; }).filter(Boolean),
+      fate_items: (fatePoolIdx >= 0 && data.content_pools[fatePoolIdx] && data.content_pools[fatePoolIdx].items)
+        ? data.content_pools[fatePoolIdx].items.map(function (i) { return i.text || ""; }).filter(Boolean)
+        : [],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }
+
   function loadData() {
-    fetch(window.API_BASE + "/api/database", { cache: "no-store" })
+    var local = loadFromLocal();
+    if (local) {
+      data.punishments = (local.punishments || []).map(function (n) { return { id: null, name: n, description: null, weight: 1 }; });
+      data.content_pools = [{ id: null, name: "命运", items: (local.fate_items || []).map(function (t) { return { id: null, text: t, weight: 1 }; }) }];
+      fatePoolIdx = 0;
+      render();
+      openModal();
+      return;
+    }
+    fetch((window.API_BASE || "") + "/api/database", { cache: "no-store" })
       .then(function (res) { return res.json(); })
       .then(function (json) {
         var res = json.data || json;
@@ -23,6 +54,7 @@
         });
         fatePoolIdx = idx >= 0 ? idx : (data.content_pools.length ? 0 : -1);
         render();
+        openModal();
       })
       .catch(function (err) {
         alert("加载数据库失败：" + (err.message || String(err)));
@@ -85,42 +117,9 @@
 
   function saveData() {
     collectFromDom();
-    var payload = {
-      punishments: data.punishments.map(function (p) {
-        return { id: p.id, name: p.name || "未命名", description: p.description || null, weight: p.weight || 1 };
-      }),
-      content_pools: data.content_pools.map(function (pool) {
-        return {
-          id: pool.id,
-          name: pool.name || "未命名",
-          items: (pool.items || []).map(function (i) {
-            return { id: i.id, text: i.text || "", weight: i.weight || 1 };
-          }),
-        };
-      }),
-    };
-    fetch(window.API_BASE + "/api/database", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      cache: "no-store",
-    })
-      .then(function (res) {
-        return res.json().then(function (json) {
-          if (!res.ok) {
-            var msg = typeof json.detail === "string" ? json.detail : JSON.stringify(json.detail || "请求失败");
-            throw new Error(msg);
-          }
-          return json.data || json;
-        });
-      })
-      .then(function () {
-        alert("保存成功");
-        closeModal();
-      })
-      .catch(function (err) {
-        alert("保存失败：" + (err.message || String(err)));
-      });
+    saveToLocal();
+    alert("已保存到本地，仅在你当前设备/浏览器生效");
+    closeModal();
   }
 
   function addPunishment() {
@@ -158,7 +157,6 @@
 
     document.getElementById("editDatabaseBtn").addEventListener("click", function () {
       loadData();
-      openModal();
     });
 
     document.getElementById("databaseModalClose").addEventListener("click", closeModal);

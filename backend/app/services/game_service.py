@@ -31,6 +31,8 @@ async def create_game(
     user_id: int | None = None,
     cell_count: int | None = None,
     difficulty: str | None = None,
+    custom_punishments: list | None = None,
+    custom_fate_items: list | None = None,
 ) -> GameSession | None:
     if cell_count is None or cell_count <= 0:
         cell_count = 20
@@ -92,20 +94,34 @@ async def create_game(
         if not board:
             return None
 
+    events_list = [{"type": "meta", "difficulty": difficulty}] if difficulty else []
+    if custom_punishments or custom_fate_items:
+        events_list.append({
+            "type": "custom_content",
+            "punishments": custom_punishments or [],
+            "fate_items": custom_fate_items or [],
+        })
     game = GameSession(
         board_id=board.id,
         current_position=0,
         status="playing",
         user_id=user_id,
         content_seed=random.randint(0, 2**31 - 1),
-        events=json.dumps(
-            [{"type": "meta", "difficulty": difficulty}] if difficulty else []
-        ),
+        events=json.dumps(events_list),
     )
     session.add(game)
     await session.flush()
     await session.refresh(game)
     return game
+
+
+def _get_custom_content(events_json: str | None) -> tuple[list | None, list | None]:
+    """从 events 中解析本地自定义内容，返回 (punishments, fate_items)"""
+    events = _parse_events(events_json)
+    for ev in events:
+        if isinstance(ev, dict) and ev.get("type") == "custom_content":
+            return (ev.get("punishments") or None, ev.get("fate_items") or None)
+    return (None, None)
 
 
 def _get_difficulty(events_json: str | None) -> str | None:
@@ -155,10 +171,12 @@ async def _build_cells(
             display_text = "命运"
         else:
             # 用种子保证同局内普通格内容稳定，只有刷新时才改变
+            custom_punishments, _ = _get_custom_content(game.events)
             seed = (game.id * 1000000 + getattr(game, "content_seed", 0) + c.position)
             rng = random.Random(seed)
             display_text = await generate_cell_content(
-                session, difficulty, multiplier=mult, rng=rng
+                session, difficulty, multiplier=mult, rng=rng,
+                custom_punishments=custom_punishments,
             )
 
         cells.append({
@@ -252,6 +270,7 @@ async def roll_dice(session: AsyncSession, game_id: int) -> dict | None:
     dr_before = getattr(game, "double_remaining_rolls", 0)
 
     # 到达的格子效果
+    _, custom_fate_items = _get_custom_content(game.events)
     cell_at = next((c for c in board.cells if c.position == to_position), None)
     if cell_at:
         effect_result: EffectResult = await apply_cell_effect(
@@ -261,6 +280,7 @@ async def roll_dice(session: AsyncSession, game_id: int) -> dict | None:
             cell_at.content_pool_id,
             to_position,
             max_pos,
+            custom_fate_items=custom_fate_items,
         )
         if effect_result.activate_double:
             game.double_remaining_rolls = 2

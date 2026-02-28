@@ -18,7 +18,9 @@
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
       var stored = JSON.parse(raw);
-      if (!stored.punishments || !stored.punishments.length) return null;
+      var hasPunishments = stored.punishments && stored.punishments.length > 0;
+      var hasFate = stored.fate_items && stored.fate_items.length > 0;
+      if (!hasPunishments && !hasFate) return null;
       return stored;
     } catch (e) { return null; }
   }

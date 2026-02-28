@@ -85,6 +85,7 @@
       };
     if (local.punishments) body.custom_punishments = local.punishments;
     if (local.fate_items) body.custom_fate_items = local.fate_items;
+    var usingLocalContent = !!(local.punishments && local.punishments.length) || !!(local.fate_items && local.fate_items.length);
     window.api
       .post("/api/games", body)
       .then(function (data) {
@@ -98,7 +99,7 @@
         updateGameInfo();
         window.boardRender.render(state.cells, state.currentPosition);
         document.getElementById("rollBtn").disabled = state.status === "finished";
-        document.getElementById("sideText").textContent = "";
+        document.getElementById("sideText").textContent = usingLocalContent ? "本局使用本地自定义内容" : "";
         renderEvents(data.recent_events);
       })
       .catch(function (err) {

@@ -241,7 +241,6 @@
             return;
           }
           statusEl.textContent = "浏览器不支持语音识别，正在加载离线模型，请稍候...";
-          startBtn.disabled = false;
           startBtn.disabled = true;
           window.voskSpeech
             .loadModel(20000)
@@ -277,25 +276,60 @@
             });
           return;
         }
+
+        // 使用浏览器内建语音识别
         statusEl.textContent = "正在录音...请从 1 数到 20";
         startBtn.classList.add("hidden");
         submitBtn.classList.remove("hidden");
         startBtn.disabled = false;
-        var rec = new Recognition();
+
+        var rec;
+        try {
+          rec = new Recognition();
+        } catch (err) {
+          statusEl.textContent = "当前浏览器暂不支持语音识别，请更换 Chrome / Edge 再试。";
+          startBtn.classList.remove("hidden");
+          submitBtn.classList.add("hidden");
+          startBtn.disabled = false;
+          return;
+        }
+
         rec.continuous = true;
         rec.lang = "zh-CN";
         rec.interimResults = false;
+
         rec.onresult = function (e) {
           for (var i = e.resultIndex; i < e.results.length; i++) {
             transcript += e.results[i][0].transcript;
           }
           transcriptEl.textContent = transcript;
         };
+
         rec.onerror = function (e) {
-          statusEl.textContent = "录音出错：" + (e.error || "未知错误");
+          var err = (e && e.error) || "unknown";
+          if (err === "not-allowed" || err === "service-not-allowed") {
+            statusEl.textContent = "浏览器拒绝或不支持语音识别，请在地址栏检查麦克风权限，或更换 Chrome / Edge 打开。";
+          } else if (err === "aborted" || err === "no-speech") {
+            statusEl.textContent = "未检测到有效语音，请重新点击“开始录音”。";
+          } else {
+            statusEl.textContent = "录音出错：" + err;
+          }
+          startBtn.classList.remove("hidden");
+          startBtn.disabled = false;
+          submitBtn.classList.add("hidden");
+          voskSession = null;
         };
-        rec.start();
-        voskSession = { type: "webspeech", rec: rec };
+
+        try {
+          rec.start();
+          voskSession = { type: "webspeech", rec: rec };
+        } catch (err) {
+          statusEl.textContent = "语音识别启动失败，请确认已允许麦克风权限后重试。";
+          startBtn.classList.remove("hidden");
+          startBtn.disabled = false;
+          submitBtn.classList.add("hidden");
+          voskSession = null;
+        }
       }
 
       // 优先使用浏览器内建语音识别，不支持时在 useWebSpeech 内部自动回退到 Vosk

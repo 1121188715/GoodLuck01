@@ -195,7 +195,7 @@
       });
   }
 
-  /** 显示挑战格弹窗：优先浏览器语音识别，不支持时加载 Vosk 离线模型；校验 1~20 */
+  /** 显示挑战格弹窗：仅使用浏览器语音识别（Web Speech API）；校验 1~20 */
   function showChallengeModal(rollData, callback) {
     var modal = document.getElementById("challengeModal");
     var hint = document.getElementById("challengeHint");
@@ -223,7 +223,7 @@
     modal.classList.remove("hidden");
 
     var transcript = "";
-    var voskSession = null;
+    var currentRec = null;
 
     startBtn.onclick = function () {
       transcript = "";
@@ -232,128 +232,67 @@
       statusEl.textContent = "正在准备语音识别...";
       startBtn.disabled = true;
 
-      function useWebSpeech() {
-        function useVoskFallback(message) {
-          if (!window.voskSpeech || !window.voskSpeech.isAvailable || !window.voskSpeech.isAvailable()) {
-            statusEl.textContent = message || "当前浏览器不支持语音识别，且未配置离线模型，请更换支持语音识别的浏览器（推荐 Chrome / Edge）。";
-            startBtn.disabled = false;
-            startBtn.classList.remove("hidden");
-            submitBtn.classList.add("hidden");
-            return;
-          }
-          statusEl.textContent = "浏览器语音服务不可用，正在加载离线模型，请稍候...";
-          startBtn.disabled = true;
-          window.voskSpeech
-            .loadModel(20000)
-            .then(function (data) {
-              if (!data || !data.model) {
-                statusEl.textContent = "离线模型加载失败，请更换浏览器或稍后重试。";
-                startBtn.disabled = false;
-                startBtn.classList.remove("hidden");
-                submitBtn.classList.add("hidden");
-                return null;
-              }
-              statusEl.textContent = "正在录音...请从 1 数到 20";
-              startBtn.classList.add("hidden");
-              submitBtn.classList.remove("hidden");
-              startBtn.disabled = false;
-              return window.voskSpeech.startRecording(
-                data.model,
-                function (partial) {
-                  transcriptEl.textContent = (transcript ? transcript + " " : "") + partial;
-                },
-                function (text) {
-                  transcript = (transcript ? transcript + " " : "") + text;
-                  transcriptEl.textContent = transcript;
-                }
-              );
-            })
-            .then(function (session) {
-              if (session) {
-                voskSession = session;
-              }
-            })
-            .catch(function () {
-              statusEl.textContent = "离线模型加载失败，请更换浏览器或稍后重试。";
-              startBtn.disabled = false;
-              startBtn.classList.remove("hidden");
-              submitBtn.classList.add("hidden");
-            });
-        }
-
-        if (!Recognition) {
-          // 浏览器不支持语音识别，直接尝试使用 Vosk 离线模型
-          useVoskFallback();
-          return;
-        }
-
-        // 使用浏览器内建语音识别
-        statusEl.textContent = "正在录音...请从 1 数到 20";
-        startBtn.classList.add("hidden");
-        submitBtn.classList.remove("hidden");
+      if (!Recognition) {
+        statusEl.textContent = "当前浏览器不支持语音识别，请更换支持语音识别的浏览器（推荐 Chrome / Edge）。";
         startBtn.disabled = false;
-
-        var rec;
-        try {
-          rec = new Recognition();
-        } catch (err) {
-          // 构造失败，改用 Vosk
-          useVoskFallback("当前浏览器暂不支持语音识别，将尝试使用离线模型。");
-          return;
-        }
-
-        rec.continuous = true;
-        rec.lang = "zh-CN";
-        rec.interimResults = false;
-
-        rec.onresult = function (e) {
-          for (var i = e.resultIndex; i < e.results.length; i++) {
-            transcript += e.results[i][0].transcript;
-          }
-          transcriptEl.textContent = transcript;
-        };
-
-        rec.onerror = function (e) {
-          var err = (e && e.error) || "unknown";
-          if (err === "not-allowed" || err === "service-not-allowed") {
-            statusEl.textContent = "浏览器拒绝或不支持语音识别，请在地址栏检查麦克风权限，或更换 Chrome / Edge 打开。";
-            startBtn.classList.remove("hidden");
-            startBtn.disabled = false;
-            submitBtn.classList.add("hidden");
-            voskSession = null;
-          } else if (err === "aborted" || err === "no-speech") {
-            statusEl.textContent = "未检测到有效语音，请重新点击“开始录音”。";
-            startBtn.classList.remove("hidden");
-            startBtn.disabled = false;
-            submitBtn.classList.add("hidden");
-            voskSession = null;
-          } else if (err === "network") {
-            // 网络错误：多数是浏览器内建语音服务不可用，自动回退到 Vosk
-            rec.onresult = null;
-            rec.onerror = null;
-            try { rec.stop(); } catch (_) {}
-            statusEl.textContent = "浏览器语音服务网络不可用，将尝试使用离线模型。";
-            useVoskFallback();
-          } else {
-            statusEl.textContent = "录音出错：" + err;
-            startBtn.classList.remove("hidden");
-            startBtn.disabled = false;
-            submitBtn.classList.add("hidden");
-            voskSession = null;
-          }
-        };
-
-        try {
-          rec.start();
-          voskSession = { type: "webspeech", rec: rec };
-        } catch (err) {
-          // 启动失败，同样回退到 Vosk
-          useVoskFallback("语音识别启动失败，将尝试使用离线模型。");
-        }
+        return;
       }
 
-      // 优先使用浏览器内建语音识别，不支持时在 useWebSpeech 内部自动回退到 Vosk
-      useWebSpeech();
+      // 使用浏览器内建语音识别
+      statusEl.textContent = "正在录音...请从 1 数到 20";
+      startBtn.classList.add("hidden");
+      submitBtn.classList.remove("hidden");
+      startBtn.disabled = false;
+
+      var rec;
+      try {
+        rec = new Recognition();
+      } catch (err) {
+        statusEl.textContent = "当前浏览器暂不支持语音识别，请更换 Chrome / Edge 再试。";
+        startBtn.classList.remove("hidden");
+        submitBtn.classList.add("hidden");
+        startBtn.disabled = false;
+        return;
+      }
+
+      rec.continuous = true;
+      rec.lang = "zh-CN";
+      rec.interimResults = false;
+
+      rec.onresult = function (e) {
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          transcript += e.results[i][0].transcript;
+        }
+        transcriptEl.textContent = transcript;
+      };
+
+      rec.onerror = function (e) {
+        var err = (e && e.error) || "unknown";
+        if (err === "not-allowed" || err === "service-not-allowed") {
+          statusEl.textContent = "浏览器拒绝或不支持语音识别，请在地址栏检查麦克风权限，或更换 Chrome / Edge 打开。";
+        } else if (err === "aborted" || err === "no-speech") {
+          statusEl.textContent = "未检测到有效语音，请重新点击“开始录音”。";
+        } else if (err === "network") {
+          statusEl.textContent = "浏览器语音服务网络不可用，请检查网络或稍后重试。";
+        } else {
+          statusEl.textContent = "录音出错：" + err;
+        }
+        startBtn.classList.remove("hidden");
+        startBtn.disabled = false;
+        submitBtn.classList.add("hidden");
+        currentRec = null;
+      };
+
+      try {
+        rec.start();
+        currentRec = rec;
+      } catch (err) {
+        statusEl.textContent = "语音识别启动失败，请确认已允许麦克风权限后重试。";
+        startBtn.classList.remove("hidden");
+        startBtn.disabled = false;
+        submitBtn.classList.add("hidden");
+        currentRec = null;
+      }
     };
 
     submitBtn.onclick = function () {
@@ -375,19 +314,12 @@
       }
 
       statusEl.textContent = "转写处理中，请稍候...";
-      if (voskSession && voskSession.stop) {
-        var finalTranscript = voskSession.getLastTranscript ? voskSession.getLastTranscript() : transcript;
-        voskSession.stop();
-        voskSession = null;
-        finish(finalTranscript || transcriptEl.textContent);
-      } else if (voskSession && voskSession.type === "webspeech" && voskSession.rec) {
-        // 对于浏览器语音识别，直接使用当前累积的 transcript，避免部分设备上 onend 不触发导致卡住
-        try { voskSession.rec.stop(); } catch (_) {}
-        finish(transcript || transcriptEl.textContent);
-        voskSession = null;
-      } else {
-        finish(transcript);
+      if (currentRec) {
+        try { currentRec.stop(); } catch (_) {}
+        currentRec = null;
       }
+      // 直接使用当前累积的 transcript，避免依赖 onend 导致部分设备卡住
+      finish(transcript || transcriptEl.textContent);
     };
   }
 

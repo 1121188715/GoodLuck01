@@ -195,7 +195,7 @@
       });
   }
 
-  /** 显示挑战格弹窗：优先 Vosk 离线识别，不可用时回退 Web Speech API；校验 1~20 */
+  /** 显示挑战格弹窗：优先浏览器语音识别，不支持时加载 Vosk 离线模型；校验 1~20 */
   function showChallengeModal(rollData, callback) {
     var modal = document.getElementById("challengeModal");
     var hint = document.getElementById("challengeHint");
@@ -215,86 +215,68 @@
     resultEl.textContent = "";
     resultEl.classList.add("hidden");
     var manualWrap = document.getElementById("challengeManualWrap");
-    var manualInput = document.getElementById("challengeManualInput");
     var manualBtn = document.getElementById("challengeManualBtn");
-    manualWrap.classList.add("hidden");
-    if (manualInput) manualInput.value = "";
-    if (window.isSecureContext) {
-      startBtn.classList.remove("hidden");
-    } else {
-      startBtn.classList.add("hidden");
-    }
-    manualBtn.classList.remove("hidden");
+    // 挑战格默认只使用语音识别，手动输入 UI 隐藏
+    if (manualWrap) manualWrap.classList.add("hidden");
+    if (manualBtn) manualBtn.classList.add("hidden");
+    startBtn.classList.remove("hidden");
     submitBtn.classList.add("hidden");
     confirmBtn.classList.add("hidden");
     modal.classList.remove("hidden");
 
     var transcript = "";
     var voskSession = null;
-    var manualMode = false;
-
-    manualBtn.onclick = function () {
-      manualMode = true;
-      if (voskSession && voskSession.stop) {
-        voskSession.stop();
-        voskSession = null;
-      } else if (voskSession && voskSession.type === "webspeech" && voskSession.rec) {
-        voskSession.rec.stop();
-        voskSession = null;
-      }
-      startBtn.classList.add("hidden");
-      manualBtn.classList.add("hidden");
-      manualWrap.classList.remove("hidden");
-      submitBtn.classList.remove("hidden");
-      statusEl.textContent = "在输入框中输入或使用手机键盘语音转文字，然后点击确认提交。";
-    };
 
     startBtn.onclick = function () {
-      if (!window.isSecureContext) {
-        statusEl.textContent = "HTTP 下麦克风不可用，请使用手动输入。";
-        return;
-      }
       transcript = "";
       transcriptEl.textContent = "";
       resultEl.classList.add("hidden");
       statusEl.textContent = "正在准备语音识别...";
       startBtn.disabled = true;
 
-      function tryVoskFirst() {
-        if (!window.voskSpeech || !window.voskSpeech.isAvailable()) return false;
-        statusEl.textContent = "正在加载 Vosk 模型（约 15 秒超时，超时将使用浏览器识别）...";
-        return window.voskSpeech.loadModel(15000)
-          .then(function (data) {
-            if (!data || !data.model) return null;
-            statusEl.textContent = "正在录音...请从 1 数到 20";
-            startBtn.classList.add("hidden");
-            submitBtn.classList.remove("hidden");
-            startBtn.disabled = false;
-            return window.voskSpeech.startRecording(
-              data.model,
-              function (partial) {
-                transcriptEl.textContent = (transcript ? transcript + " " : "") + partial;
-              },
-              function (text) {
-                transcript = (transcript ? transcript + " " : "") + text;
-                transcriptEl.textContent = transcript;
-              }
-            );
-          })
-          .then(function (session) {
-            if (session) {
-              voskSession = session;
-              return true;
-            }
-            return false;
-          })
-          .catch(function () { return false; });
-      }
-
       function useWebSpeech() {
         if (!Recognition) {
-          statusEl.textContent = "语音识别不可用，将视为挑战成功。";
+          // 浏览器不支持语音识别，尝试使用 Vosk 离线模型
+          if (!window.voskSpeech || !window.voskSpeech.isAvailable || !window.voskSpeech.isAvailable()) {
+            statusEl.textContent = "当前浏览器不支持语音识别，且未配置离线模型，请更换支持语音识别的浏览器（推荐 Chrome / Edge）。";
+            startBtn.disabled = false;
+            return;
+          }
+          statusEl.textContent = "浏览器不支持语音识别，正在加载离线模型，请稍候...";
           startBtn.disabled = false;
+          startBtn.disabled = true;
+          window.voskSpeech
+            .loadModel(20000)
+            .then(function (data) {
+              if (!data || !data.model) {
+                statusEl.textContent = "离线模型加载失败，请更换浏览器或稍后重试。";
+                startBtn.disabled = false;
+                return null;
+              }
+              statusEl.textContent = "正在录音...请从 1 数到 20";
+              startBtn.classList.add("hidden");
+              submitBtn.classList.remove("hidden");
+              startBtn.disabled = false;
+              return window.voskSpeech.startRecording(
+                data.model,
+                function (partial) {
+                  transcriptEl.textContent = (transcript ? transcript + " " : "") + partial;
+                },
+                function (text) {
+                  transcript = (transcript ? transcript + " " : "") + text;
+                  transcriptEl.textContent = transcript;
+                }
+              );
+            })
+            .then(function (session) {
+              if (session) {
+                voskSession = session;
+              }
+            })
+            .catch(function () {
+              statusEl.textContent = "离线模型加载失败，请更换浏览器或稍后重试。";
+              startBtn.disabled = false;
+            });
           return;
         }
         statusEl.textContent = "正在录音...请从 1 数到 20";
@@ -318,14 +300,8 @@
         voskSession = { type: "webspeech", rec: rec };
       }
 
-      var p = tryVoskFirst();
-      if (p && typeof p.then === "function") {
-        p.then(function (used) {
-          if (!used) useWebSpeech();
-        });
-      } else {
-        useWebSpeech();
-      }
+      // 优先使用浏览器内建语音识别，不支持时在 useWebSpeech 内部自动回退到 Vosk
+      useWebSpeech();
     };
 
     submitBtn.onclick = function () {
@@ -340,17 +316,10 @@
         submitBtn.classList.add("hidden");
         submitBtn.disabled = false;
         confirmBtn.classList.remove("hidden");
-        if (manualMode && manualWrap) manualWrap.classList.add("hidden");
+        if (manualWrap) manualWrap.classList.add("hidden");
         confirmBtn.onclick = function () {
           submitChallengeAndClose(modal, startBtn, submitBtn, confirmBtn, success, rollData, callback);
         };
-      }
-
-      if (manualMode && manualInput) {
-        statusEl.textContent = "校验中...";
-        var val = (manualInput.value || "").trim();
-        finish(val);
-        return;
       }
 
       statusEl.textContent = "转写处理中，请稍候...";

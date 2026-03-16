@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<title>AutoMaster 挥动机构 BOM 采购表（方案A / 方案B）</title>
+<style>
+body { font-family: "Microsoft YaHei", SimSun, sans-serif; margin: 24px; }
+h1 { font-size: 18pt; }
+h2 { font-size: 14pt; margin-top: 20px; }
+p.note { color: #666; font-size: 10pt; }
+table { border-collapse: collapse; margin: 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #333; padding: 6px 10px; text-align: left; }
+th { background: #eee; }
+td.num { text-align: right; }
+td.center { text-align: center; }
+.sum { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>AutoMaster 挥动机构 BOM 采购表</h1>
+<p class="note">说明：以下为方案 A（直流直驱）与方案 B（曲柄摇杆）两份独立 BOM，价格为人民币预估（参考淘宝/1688 常见价），不含税与运费。可用 Word 打开本文件后另存为 .docx，或用 Excel 打开同目录下 .csv 文件编辑。</p>
+
+<h2>方案 A：直流电机 + 直驱</h2>
+<table>
+<thead>
+<tr>
+<th>序号</th><th>类别</th><th>名称</th><th>规格型号</th><th>数量</th><th>单位</th><th>预估单价(元)</th><th>预估小计(元)</th><th>备注与采购关键词</th>
+</tr>
+</thead>
+<tbody>
+<tr><td class="center">1</td><td>电气</td><td>12V直流减速电机</td><td>输出扭矩≥3.5N·m 额定转速20-50rpm 轴径6-8mm</td><td class="center">1</td><td class="center">个</td><td class="num">120</td><td class="num">120</td><td>淘宝/1688搜"12V减速电机 大扭矩 低速"</td></tr>
+<tr><td class="center">2</td><td>电气</td><td>H桥驱动模块</td><td>L298N 或 TB6612FNG 12V 2A</td><td class="center">1</td><td class="center">个</td><td class="num">20</td><td class="num">20</td><td>与电气BOM共用</td></tr>
+<tr><td class="center">3</td><td>机械</td><td>摆臂</td><td>铝合金型材或碳纤维杆 长250-300mm 转轴到质心</td><td class="center">1</td><td class="center">根</td><td class="num">45</td><td class="num">45</td><td>轻量化 截面约20×20mm或圆管φ10-12</td></tr>
+<tr><td class="center">4</td><td>机械</td><td>光轴</td><td>直径8mm 长80-120mm 不锈钢</td><td class="center">1</td><td class="center">根</td><td class="num">18</td><td class="num">18</td><td>与摆臂转轴配合</td></tr>
+<tr><td class="center">5</td><td>机械</td><td>法兰轴承</td><td>608ZZ 或 8mm内径法兰轴承</td><td class="center">2</td><td class="center">个</td><td class="num">8</td><td class="num">16</td><td>支撑转轴</td></tr>
+<tr><td class="center">6</td><td>机械</td><td>轴承座/法兰座</td><td>8mm 固定用</td><td class="center">2</td><td class="center">个</td><td class="num">12</td><td class="num">24</td><td>或3D打印/铝块加工</td></tr>
+<tr><td class="center">7</td><td>机械</td><td>联轴器</td><td>6-8mm 电机轴与光轴</td><td class="center">1</td><td class="center">个</td><td class="num">15</td><td class="num">15</td><td>弹性联轴器 直连可省</td></tr>
+<tr><td class="center">8</td><td>紧固</td><td>螺丝螺母垫片</td><td>M4 M5 不锈钢 若干</td><td class="center">1</td><td class="center">套</td><td class="num">15</td><td class="num">15</td><td>固定电机 轴承座 摆臂</td></tr>
+<tr><td class="center">9</td><td>机械</td><td>限位挡块/限位片</td><td>可选 抬起位与拍击位</td><td class="center">2</td><td class="center">个</td><td class="num">5</td><td class="num">10</td><td>微动开关触发用 首版可省略</td></tr>
+<tr><td colspan="7" class="sum">方案 A 小计</td><td class="num sum">283</td><td>元</td></tr>
+</tbody>
+</table>
+
+<h2>方案 B：曲柄摇杆 / 四杆机构</h2>
+<table>
+<thead>
+<tr>
+<th>序号</th><th>类别</th><th>名称</th><th>规格型号</th><th>数量</th><th>单位</th><th>预估单价(元)</th><th>预估小计(元)</th><th>备注与采购关键词</th>
+</tr>
+</thead>
+<tbody>
+<tr><td class="center">1</td><td>电气</td><td>12V直流减速电机</td><td>输出扭矩≥3.5N·m 额定转速20-50rpm 轴径6-8mm</td><td class="center">1</td><td class="center">个</td><td class="num">120</td><td class="num">120</td><td>与方案A同款 与电气BOM共用</td></tr>
+<tr><td class="center">2</td><td>电气</td><td>H桥驱动模块</td><td>L298N 或 TB6612FNG 12V 2A</td><td class="center">1</td><td class="center">个</td><td class="num">20</td><td class="num">20</td><td>与电气BOM共用</td></tr>
+<tr><td class="center">3</td><td>机械</td><td>曲柄</td><td>圆盘或臂 半径50-80mm 与电机轴固定</td><td class="center">1</td><td class="center">个</td><td class="num">35</td><td class="num">35</td><td>保证60°摆动 与连杆铰接</td></tr>
+<tr><td class="center">4</td><td>机械</td><td>连杆</td><td>长80-150mm 两端铰接孔 M4</td><td class="center">1</td><td class="center">根</td><td class="num">28</td><td class="num">28</td><td>铝合金或钢 与曲柄/摇杆连接</td></tr>
+<tr><td class="center">5</td><td>机械</td><td>摇杆</td><td>与末端执行器固连 长度与曲柄连杆匹配 铰接孔M4</td><td class="center">1</td><td class="center">根</td><td class="num">32</td><td class="num">32</td><td>实现挥下-抬起单侧摆动</td></tr>
+<tr><td class="center">6</td><td>机械</td><td>鱼眼接头/关节轴承</td><td>M4 杆端关节轴承 或 鱼眼接头</td><td class="center">4</td><td class="center">个</td><td class="num">6</td><td class="num">24</td><td>曲柄-连杆、连杆-摇杆 各2个</td></tr>
+<tr><td class="center">7</td><td>机械</td><td>铰接轴/销轴</td><td>M4×20~30 不锈钢 带卡簧槽</td><td class="center">4</td><td class="center">个</td><td class="num">3</td><td class="num">12</td><td>与鱼眼配合</td></tr>
+<tr><td class="center">8</td><td>紧固</td><td>螺栓螺母</td><td>M4 不锈钢 法兰面防松</td><td class="center">1</td><td class="center">套</td><td class="num">12</td><td class="num">12</td><td>铰接与电机轴固定</td></tr>
+<tr><td class="center">9</td><td>机械</td><td>电机轴连接件</td><td>电机轴与曲柄固定 键槽或顶丝</td><td class="center">1</td><td class="center">个</td><td class="num">18</td><td class="num">18</td><td>联轴器或定制法兰</td></tr>
+<tr><td class="center">10</td><td>机械</td><td>限位挡块</td><td>可选 防止过行程</td><td class="center">2</td><td class="center">个</td><td class="num">5</td><td class="num">10</td><td>首版可省略</td></tr>
+<tr><td colspan="7" class="sum">方案 B 小计</td><td class="num sum">305</td><td>元</td></tr>
+</tbody>
+</table>
+
+<p class="note">价格估算依据：淘宝/1688 常见 DIY 与小型机械件报价（约 2024–2025 年水平），实际以采购时为准。电机与驱动与整机电气 BOM 共用，若已采购则仅计机械件差异。</p>
+
+</body>
+</html>

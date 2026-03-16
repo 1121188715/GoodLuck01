@@ -207,9 +207,7 @@
     var confirmBtn = document.getElementById("challengeConfirmBtn");
     var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    hint.textContent = window.isSecureContext
-      ? "点击下方按钮开始录音，或使用手动输入（可配合手机键盘的语音转文字）。"
-      : "HTTP 下麦克风不可用，请使用手动输入（可配合手机键盘的语音转文字）。";
+    hint.textContent = "点击“开始录音”，请清晰地从 1 数到 20。";
     statusEl.textContent = "";
     transcriptEl.textContent = "";
     resultEl.textContent = "";
